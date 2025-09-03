@@ -5,11 +5,11 @@
 Uma breve descrição do seu projeto e seu propósito.
 
 ## 📌 Índice
-- [Pré-requisitos](#pré-requisitos)
-- [Instalação](#instalação)
-- [Como Usar](#como-usar)
-- [Licença](#licença)
-- [Contato](#contato)
+- [Pré-requisitos]
+- [Instalação]
+- [Como Usar]
+- [Licença]
+- [Contato]
 
 ## ⚙️ Pré-requisitos
 - Python 3.11.2

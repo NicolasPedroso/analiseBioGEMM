@@ -3,6 +3,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define MAX_ENTRADAS 1000
 #define TAM_LINHA 512
@@ -12,6 +13,29 @@ typedef struct {
     char aminoacido[10];
     int contagem;
 } Entrada;
+
+/* Lista fixa de aminoácidos (em ordem alfabética) */
+const char *aminoacidos_lista[] = {
+    "Ala", "Arg", "Asn", "Asp", "Cys",
+    "Gln", "Glu", "Gly", "His", "Ile",
+    "Leu", "Lys", "Met", "None", "Phe",
+    "Pro", "Ser", "Thr", "Trp", "Tyr",
+    "Undet", "Val"
+};
+const int NUM_AMINO = sizeof(aminoacidos_lista) / sizeof(aminoacidos_lista[0]);
+
+/* Função para garantir que a pasta tabela exista */
+void criaPastaTabela() {
+    struct stat st = {0};
+    if (stat("tabela", &st) == -1) {
+        if (mkdir("tabela", 0755) == 0) {
+            printf("Pasta 'tabela' criada.\n");
+        } else {
+            perror("Erro ao criar pasta 'tabela'");
+            exit(1);
+        }
+    }
+}
 
 void adicionaOuIncrementa(Entrada *tabela, int *total, const char *codon, const char *aminoacido) {
     for (int i = 0; i < *total; i++) {
@@ -60,9 +84,10 @@ void processaArquivoTabular(const char *caminho) {
 
     fclose(f);
 
-    /*Criar nome do arquivo de saida substituindo ".tabular" por ".tabela"*/
+    /* Criar nome do arquivo de saída dentro da pasta tabela */
     char nomeSaida[512];
-    strncpy(nomeSaida, caminho, sizeof(nomeSaida));
+    snprintf(nomeSaida, sizeof(nomeSaida), "tabela/%s", strrchr(caminho, '/') ? strrchr(caminho, '/') + 1 : caminho);
+
     char *p = strstr(nomeSaida, ".tabular");
     if (p) strcpy(p, ".tabela");
     else strcat(nomeSaida, ".tabela");
@@ -73,33 +98,27 @@ void processaArquivoTabular(const char *caminho) {
         return;
     }
 
-    /*Agrupar por aminoacido*/
-    for (int i = 0; i < total; i++) {
-        if (tabela[i].contagem == -1) continue; /*Ja processado*/
+    /* Para cada aminoácido da lista fixa */
+    for (int idx = 0; idx < NUM_AMINO; idx++) {
+        const char *amino = aminoacidos_lista[idx];
+        int encontrou = 0;
 
-        fprintf(saida, "%s |", tabela[i].aminoacido);
-        for (int j = i; j < total; j++) {
-            if (strcmp(tabela[i].aminoacido, tabela[j].aminoacido) == 0) {
-                fprintf(saida, "%s%d", tabela[j].codon, tabela[j].contagem);
-                if (j + 1 < total) {
-                    /*Verifica se tem mais do mesmo aminoacido*/
-                    int temMais = 0;
-                    for (int k = j + 1; k < total; k++) {
-                        if (strcmp(tabela[i].aminoacido, tabela[k].aminoacido) == 0) {
-                            temMais = 1;
-                            break;
-                        }
-                    }
-                    if (temMais) fprintf(saida, ",");
-                }
-                tabela[j].contagem = -1; /*Marca como processado*/
+        fprintf(saida, "%s |", amino);
+
+        /* Percorre a tabela procurando registros desse aminoácido */
+        for (int i = 0; i < total; i++) {
+            if (strcmp(amino, tabela[i].aminoacido) == 0 && tabela[i].contagem > 0) {
+                if (encontrou) fprintf(saida, ",");
+                fprintf(saida, "%s%d", tabela[i].codon, tabela[i].contagem);
+                encontrou = 1;
             }
         }
+
         fprintf(saida, "\n");
     }
 
     fclose(saida);
-    printf("Arquivo '%s' processado.\n", caminho);
+    printf("Arquivo '%s' processado -> '%s'.\n", caminho, nomeSaida);
 }
 
 void percorreDiretorio(const char *caminho) {
@@ -121,7 +140,7 @@ void percorreDiretorio(const char *caminho) {
         if (stat(caminhoCompleto, &info) != 0) continue;
 
         if (S_ISDIR(info.st_mode)) {
-            percorreDiretorio(caminhoCompleto); /*Recursao*/
+            percorreDiretorio(caminhoCompleto); /* Recursão */
         } else if (S_ISREG(info.st_mode)) {
             const char *ext = strrchr(caminhoCompleto, '.');
             if (ext && strcmp(ext, ".tabular") == 0) {
@@ -139,6 +158,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    criaPastaTabela();
     percorreDiretorio(argv[1]);
     return 0;
 }

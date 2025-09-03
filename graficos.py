@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import os
 import glob
-import sys  # <--- necessário para ler argumentos
+import sys
+import re
 
 def processar_arquivo(caminho):
     dados = {}
@@ -12,7 +13,16 @@ def processar_arquivo(caminho):
             amino, codons = linha.strip().split("|")
             amino = amino.strip()
             codons = codons.strip().split(",")
-            total = sum(int(c[-1]) for c in codons if c[-1].isdigit())
+            total = 0
+            for c in codons:
+                c = c.strip()
+                if not c:
+                    continue
+                # separa letras e números (ex: "GCC5" -> "GCC", "5")
+                m = re.match(r"([A-Z\?]+)(\d+)$", c)
+                if m:
+                    numero = int(m.group(2))
+                    total += numero
             dados[amino] = dados.get(amino, 0) + total
     return dados
 
@@ -31,34 +41,44 @@ def gerar_grafico(dados, titulo, saida):
     plt.close()
 
 def main():
-    #Pega o caminho da pasta passado pelo usuario
     if len(sys.argv) != 2:
-        print("Uso: python3 grafico.py <caminho_da_pasta>")
+        print("Uso: python3 graficos.py <caminho_da_pasta>")
         sys.exit(1)
 
-    pasta = sys.argv[1]  #Pasta passada pelo usuario
+    pasta = sys.argv[1]
+
+    # Cria a pasta "resultados" no diretório atual, se não existir
+    pasta_resultados = os.path.join(os.getcwd(), "resultados")
+    os.makedirs(pasta_resultados, exist_ok=True)
+
     todos_dados = {}
 
-    #Procurar todos os arquivos .tabela dentro da pasta e subpastas
+    # procura arquivos .tabela recursivamente
     arquivos = glob.glob(os.path.join(pasta, "**", "*.tabela"), recursive=True)
+
+    if not arquivos:
+        print("Nenhum arquivo .tabela encontrado.")
+        sys.exit(0)
 
     for arquivo in arquivos:
         dados = processar_arquivo(arquivo)
-        
-        #Nome do grafico individual
-        nome_saida = os.path.splitext(os.path.basename(arquivo))[0] + "_grafico.png"
-        gerar_grafico(dados, f"Frequência em {os.path.basename(arquivo)}", nome_saida)
-        print(f"Gráfico gerado: {nome_saida}")
 
-        #Acumular no geral
+        # Nome do gráfico individual dentro da pasta "resultados"
+        nome_saida = os.path.splitext(os.path.basename(arquivo))[0] + "_grafico.png"
+        caminho_saida = os.path.join(pasta_resultados, nome_saida)
+
+        gerar_grafico(dados, f"Frequência em {os.path.basename(arquivo)}", caminho_saida)
+        print(f"Gráfico gerado: {caminho_saida}")
+
+        # acumula no geral
         for k, v in dados.items():
             todos_dados[k] = todos_dados.get(k, 0) + v
 
-    #Grafico geral
+    # gera gráfico geral
     if todos_dados:
-        gerar_grafico(todos_dados, "Gráfico Geral", "geral_grafico.png")
-        print("Gráfico geral gerado: geral_grafico.png")
+        caminho_saida_geral = os.path.join(pasta_resultados, "geral_grafico.png")
+        gerar_grafico(todos_dados, "Gráfico Geral", caminho_saida_geral)
+        print(f"Gráfico geral gerado: {caminho_saida_geral}")
 
 if __name__ == "__main__":
     main()
-    

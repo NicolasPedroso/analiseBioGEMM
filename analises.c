@@ -60,7 +60,7 @@ void processaArquivoTabular(const char *caminho) {
 
     fclose(f);
 
-    // Criar nome do arquivo de saída substituindo ".tabular" por ".tabela"
+    /*Criar nome do arquivo de saida substituindo ".tabular" por ".tabela"*/
     char nomeSaida[512];
     strncpy(nomeSaida, caminho, sizeof(nomeSaida));
     char *p = strstr(nomeSaida, ".tabular");
@@ -73,26 +73,26 @@ void processaArquivoTabular(const char *caminho) {
         return;
     }
 
-    // Agrupar por códon
+    /*Agrupar por aminoacido*/
     for (int i = 0; i < total; i++) {
-        if (tabela[i].contagem == -1) continue; // já processado
+        if (tabela[i].contagem == -1) continue; /*Ja processado*/
 
-        fprintf(saida, "%s |", tabela[i].codon);
+        fprintf(saida, "%s |", tabela[i].aminoacido);
         for (int j = i; j < total; j++) {
-            if (strcmp(tabela[i].codon, tabela[j].codon) == 0) {
-                fprintf(saida, "%s%d", tabela[j].aminoacido, tabela[j].contagem);
+            if (strcmp(tabela[i].aminoacido, tabela[j].aminoacido) == 0) {
+                fprintf(saida, "%s%d", tabela[j].codon, tabela[j].contagem);
                 if (j + 1 < total) {
-                    // Verifica se tem mais do mesmo códon
+                    /*Verifica se tem mais do mesmo aminoacido*/
                     int temMais = 0;
                     for (int k = j + 1; k < total; k++) {
-                        if (strcmp(tabela[i].codon, tabela[k].codon) == 0) {
+                        if (strcmp(tabela[i].aminoacido, tabela[k].aminoacido) == 0) {
                             temMais = 1;
                             break;
                         }
                     }
                     if (temMais) fprintf(saida, ",");
                 }
-                tabela[j].contagem = -1; // marca como processado
+                tabela[j].contagem = -1; /*Marca como processado*/
             }
         }
         fprintf(saida, "\n");
@@ -121,7 +121,7 @@ void percorreDiretorio(const char *caminho) {
         if (stat(caminhoCompleto, &info) != 0) continue;
 
         if (S_ISDIR(info.st_mode)) {
-            percorreDiretorio(caminhoCompleto); // recursão
+            percorreDiretorio(caminhoCompleto); /*Recursao*/
         } else if (S_ISREG(info.st_mode)) {
             const char *ext = strrchr(caminhoCompleto, '.');
             if (ext && strcmp(ext, ".tabular") == 0) {

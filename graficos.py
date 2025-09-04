@@ -3,9 +3,12 @@ import os
 import glob
 import sys
 import re
+from collections import defaultdict
 
 def processar_arquivo(caminho):
-    dados = {}
+    dados_totais = {}         # soma de todos os códons por aminoácido (para gráfico de barras)
+    dados_distrib = defaultdict(list)  # lista de valores de cada códon (para boxplot)
+
     with open(caminho, "r", encoding="utf-8") as f:
         for linha in f:
             if "|" not in linha:
@@ -13,20 +16,21 @@ def processar_arquivo(caminho):
             amino, codons = linha.strip().split("|")
             amino = amino.strip()
             codons = codons.strip().split(",")
-            total = 0
+
             for c in codons:
                 c = c.strip()
                 if not c:
                     continue
-                # separa letras e números (ex: "GCC5" -> "GCC", "5")
+                # separa letras e números (ex: "GCC12" -> "GCC", "12")
                 m = re.match(r"([A-Z\?]+)(\d+)$", c)
                 if m:
                     numero = int(m.group(2))
-                    total += numero
-            dados[amino] = dados.get(amino, 0) + total
-    return dados
+                    dados_totais[amino] = dados_totais.get(amino, 0) + numero
+                    dados_distrib[amino].append(numero)
 
-def gerar_grafico(dados, titulo, saida):
+    return dados_totais, dados_distrib
+
+def gerar_grafico_barras(dados, titulo, saida):
     labels = list(dados.keys())
     valores = list(dados.values())
 
@@ -40,6 +44,20 @@ def gerar_grafico(dados, titulo, saida):
     plt.savefig(saida)
     plt.close()
 
+def gerar_grafico_boxplot(dados_distrib, titulo, saida):
+    labels = list(dados_distrib.keys())
+    valores = [dados_distrib[amino] for amino in labels]
+
+    plt.figure(figsize=(12,6))
+    plt.boxplot(valores, labels=labels, patch_artist=True)
+    plt.xlabel("Aminoácidos")
+    plt.ylabel("Distribuição dos códons")
+    plt.title(titulo)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(saida)
+    plt.close()
+
 def main():
     if len(sys.argv) != 2:
         print("Uso: python3 graficos.py <caminho_da_pasta>")
@@ -47,13 +65,16 @@ def main():
 
     pasta = sys.argv[1]
 
-    # Cria a pasta "resultados" no diretório atual, se não existir
+    # Cria as pastas de saída
     pasta_resultados = os.path.join(os.getcwd(), "resultados")
-    os.makedirs(pasta_resultados, exist_ok=True)
+    pasta_barras = os.path.join(pasta_resultados, "graficos_barras")
+    pasta_boxplot = os.path.join(pasta_resultados, "graficos_boxplot")
+    os.makedirs(pasta_barras, exist_ok=True)
+    os.makedirs(pasta_boxplot, exist_ok=True)
 
-    todos_dados = {}
+    todos_dados_totais = {}
+    todos_dados_distrib = defaultdict(list)
 
-    # procura arquivos .tabela recursivamente
     arquivos = glob.glob(os.path.join(pasta, "**", "*.tabela"), recursive=True)
 
     if not arquivos:
@@ -61,24 +82,36 @@ def main():
         sys.exit(0)
 
     for arquivo in arquivos:
-        dados = processar_arquivo(arquivo)
+        dados_totais, dados_distrib = processar_arquivo(arquivo)
+        nome_base = os.path.splitext(os.path.basename(arquivo))[0]
 
-        # Nome do gráfico individual dentro da pasta "resultados"
-        nome_saida = os.path.splitext(os.path.basename(arquivo))[0] + "_grafico.png"
-        caminho_saida = os.path.join(pasta_resultados, nome_saida)
+        # gráfico de barras
+        caminho_saida_barras = os.path.join(pasta_barras, nome_base + "_barras.png")
+        gerar_grafico_barras(dados_totais, f"Frequência em {os.path.basename(arquivo)}", caminho_saida_barras)
+        print(f"Gráfico de barras gerado: {caminho_saida_barras}")
 
-        gerar_grafico(dados, f"Frequência em {os.path.basename(arquivo)}", caminho_saida)
-        print(f"Gráfico gerado: {caminho_saida}")
+        # gráfico boxplot
+        caminho_saida_box = os.path.join(pasta_boxplot, nome_base + "_boxplot.png")
+        gerar_grafico_boxplot(dados_distrib, f"Distribuição em {os.path.basename(arquivo)}", caminho_saida_box)
+        print(f"Gráfico boxplot gerado: {caminho_saida_box}")
 
-        # acumula no geral
-        for k, v in dados.items():
-            todos_dados[k] = todos_dados.get(k, 0) + v
+        # acumula nos totais e distribuições gerais
+        for k, v in dados_totais.items():
+            todos_dados_totais[k] = todos_dados_totais.get(k, 0) + v
+        for k, lista in dados_distrib.items():
+            todos_dados_distrib[k].extend(lista)
 
-    # gera gráfico geral
-    if todos_dados:
-        caminho_saida_geral = os.path.join(pasta_resultados, "geral_grafico.png")
-        gerar_grafico(todos_dados, "Gráfico Geral", caminho_saida_geral)
-        print(f"Gráfico geral gerado: {caminho_saida_geral}")
+    # gráficos gerais
+    if todos_dados_totais:
+        caminho_saida_geral_barras = os.path.join(pasta_barras, "geral_barras.png")
+        gerar_grafico_barras(todos_dados_totais, "Gráfico Geral (Barras)", caminho_saida_geral_barras)
+        print(f"Gráfico geral de barras gerado: {caminho_saida_geral_barras}")
+
+    if todos_dados_distrib:
+        caminho_saida_geral_box = os.path.join(pasta_boxplot, "geral_boxplot.png")
+        gerar_grafico_boxplot(todos_dados_distrib, "Gráfico Geral (Boxplot)", caminho_saida_geral_box)
+        print(f"Gráfico geral boxplot gerado: {caminho_saida_geral_box}")
 
 if __name__ == "__main__":
     main()
+
